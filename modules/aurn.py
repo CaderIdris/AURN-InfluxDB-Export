@@ -1,19 +1,118 @@
+""" Contains classes and methods that scrape data from the DEFRA website
+to download metadata and measurements for the AURN
+
+The AURN has no official API for Python so metadata and measurements have to
+be obtained by scraping HTML data from the DEFRA website. This module 
+handles all communications with the DEFRA website, obtaining metadata and 
+measurements
+
+    Classes:
+        AURNAPI: Handles communication with the AURN/DEFRA website to get
+        metadata and measurements
+"""
+
+__author__ = "Joe Hayward"
+__copyright__ = "2021, Joe Hayward"
+__credits__ = ["Joe Hayward"]
+__license__ = "GNU General Public License v3.0"
+__version__ = "0.1"
+__maintainer__ = "Joe Hayward"
+__email__ = "j.d.hayward@surrey.ac.uk"
+__status__ = "Alpha"
+
 import requests as req
 from lxml import html  # Needed to scrape AURN website for metadata
 import pandas as pd
 import datetime as dt 
 
 class AURNAPI:
-    """
+    """ Handles communication with the AURN/DEFRA website to get metadata
+    and measurements
+
+    Attributes:
+        config (dict): Contains config information from config.json
+
+        metadata (list): Contains dictionaries which house all metadata for
+        AURN sites that were active in the specified data range, split in to
+        "tags" for all text info (Site Name etc) and "fields" for location 
+        info (Latitude etc)
+
+    Methods:
+        get_metadata: Download a csv file containing info on all AURN sites,
+        use the UK-AIR ID to search the AURN website for the "Download Code"
+        for the site (A 2-4 character code that is used in the download url
+        for the measurement csvs) and put metadata and download code in to a
+        dictionary that gets put in to a list
+
     """
     def __init__(self, config):
-        """
+        """Initialises class
+
+        Keyword arguments:
+            config (dict): Contains info used in class, configured in 
+            config.json
         """
         self.config = config
         self.metadata = list()
 
     def get_metadata(self, start_year, end_year):
-        """
+        """ Downloads metadata from AURN/DEFRA website
+
+        As there's no official Python API for the AURN, this function scrapes
+        the AURN/DEFRA website's HTML source for a) a csv containing all 
+        metadata for all stations in the network and b) The download link for 
+        csv files in the network
+
+        Keyword arguments:
+            start_year (int): The year the measurement download will start 
+            from
+
+            end_year (int): The last year the measurement download will cover
+
+        Variables:
+            metadata_search_url (str): The url used to search for info on all 
+            stations in the network
+
+            metadata_html_page (request): Returned information from html
+            request for metadata
+
+            metadata_html_source (html object): lxml searchable metadata_html_page
+
+            metadata_csv_link (str): Link to metadata csv, obtained by 
+            searching html with an XPath string
+
+            site_start_year (int): The year the site started operating
+
+            site_end_year (int): The year the site ended operating. 
+            Set to current year + 1 if still in operation (nan in csv)
+            
+            start_year_in_range (bool): Do start_year and end_year fall within site_start_year?
+
+            end_year_in_range (bool): Do start_year and end_year fall within site_end_year?
+
+            data_not_available (bool): Does the date range cross the dates
+            the site was active?
+
+            not_aurn_site (bool): Is the site an AURN site? Some sites in the 
+            csv are duplicates with different names but the same download url,
+            one of the duplicates doesn't state it's AURN so this test removes
+            them
+
+            uk_air_id (str): The ID code for the station, used to search for
+            the download code
+
+            site_info_url (str): The url for the information for a site
+
+            site_info_html_page (request): Returned information for site info
+            request
+
+            site_info_html_source (html object): lxml searchable site_info_html_page
+
+            site_info_link_xpath (list): List of all links in tbale on 
+            site_info_html_page
+
+            download_url (str): Download url for measurement csvs
+
         """
 
         # Get HTML file with search results of all sites, open or closed, 
@@ -27,10 +126,9 @@ class AURNAPI:
         metadata_html_source = html.fromstring(metadata_html_page.content)
         
         # Search HTML file for link to csv metadata using xpath
-        metadata_csv_link_xpath = metadata_html_source.xpath(
+        metadata_csv_link = metadata_html_source.xpath(
                 self.config["XPath to CSV"]
-                )
-        metadata_csv_link = metadata_csv_link_xpath[0]
+                )[0]
 
         # Download metadata csv
         metadata_csv = pd.read_table(metadata_csv_link, sep=",")
@@ -91,11 +189,11 @@ class AURNAPI:
                     self.config["XPath to Code"]
                     )
             for site_info_link in site_info_link_xpath:
-                download_code = None
+                download_url = None
                 if self.config['AURN Data Link'] in site_info_link:
-                    download_code = site_info_link.split('=')[1]
+                    download_url = site_info_link
                     continue
-            if download_code is not None:
+            if download_url is not None:
                 self.metadata.append(
                         {
                         "tags": {
@@ -105,7 +203,7 @@ class AURNAPI:
                             "Site Name": row["Site Name"],
                             "Environment Type": row["Environment Type"],
                             "Zone": row["Zone"],
-                            "Download Code": download_code
+                            "Download URL": download_url
                             },
                         "fields": {
                             "Latitude": float(row["Latitude"]),
