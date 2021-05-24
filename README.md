@@ -60,6 +60,51 @@ TBA
 
 ---
 
-## Example data
+## Available Pollutant Tags
 
-TBA
+### AURN
+- Nitric oxide
+- Nitrogen dioxide
+- Nitrogen oxides as nitrogen dioxide
+- Ozone
+- PM2.5 particulate matter
+- Volatile PM2.5
+- Non-volatile PM2.5
+- Daily measured PM2.5
+- PM10 particulate matter
+- Volatile PM10
+- Non-volatile PM10
+- Daily measured PM10
+- Sulphur dioxide
+
+### Other
+Some other pollutants are downloaded from other networks, they can also be saved if required
+- n-heptane
+- cis-2-butene
+- n-pentane
+- ethyne
+- 1,3,5-trimethylbenzene
+- n-butane
+- 1,3-butadiene
+- 1,2,4-trimethylbenzene
+- m+p-xylene
+- n-hexane
+- isoprene
+- 1-butene
+- ethene
+- ethylbenzene
+- 1,2,3-trimethylbenzene
+- trans-2-butene
+- o-xylene
+- propane
+- iso-butane
+- n-octane
+- toluene
+- ethane
+- 1-pentene
+- propene
+- trans-2-pentene
+- benzene
+- iso-pentane
+- 2-methylpentane
+- iso-octane
