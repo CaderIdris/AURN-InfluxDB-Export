@@ -14,8 +14,49 @@ import argparse
 import json
 import datetime as dt
 
-from modules.influxwrite import InfluxWriter
+from modules.timetools import TimeCalculator
 from modules.aurn import AURNAPI
+from modules.influxwrite import InfluxWriter
+
+def parse_date_string(dateString):
+    """Parses input strings in to date objects
+
+    Keyword arguments:
+        date_string (str): String to be parsed in to date object
+
+    Variables:
+        parsable_formats (list): List of formats recognised by
+        the program. If none are suitable, the program informs
+        the user of suitable formats that can be used instead
+
+    Returns:
+        Datetime object equivalent of input
+
+    Raises:
+        ValueError if input isn't in a suitable format
+
+    """
+    parsableFormats = [
+            "%Y",
+            "%Y-%m",
+            "%Y/%m",
+            "%Y\\%m",
+            "%Y.%m.%d",
+            "%Y-%m-%d", 
+            "%Y/%m/%d", 
+            "%Y\\%m\\%d", 
+            "%Y.%m.%d"
+            ]
+    for fmt in parsableFormats:
+        try:
+            return dt.datetime.strptime(dateString, fmt)
+        except ValueError:
+            pass
+    raise ValueError(
+        f'"{dateString}" is not in the correct format. Please'
+        f" use one of the following:\n{parsableFormats}"
+    )
+
 
 def fancy_print(
     str_to_print,
@@ -132,6 +173,20 @@ if __name__ == "__main__":
         "and writes it to an InfluxDB 2.0 database."
     )
     arg_parser.add_argument(
+        "-s",
+        "--start-date",
+        type=str,
+        help="Date to start data export from",
+        default="N/A",
+    )
+    arg_parser.add_argument(
+        "-e",
+        "--end-date",
+        type=str,
+        help="Date to end data export, this date is not included in output",
+        default="N/A",
+    )
+    arg_parser.add_argument(
         "-c",
         "--config",
         type=str,
@@ -140,8 +195,11 @@ if __name__ == "__main__":
         default="Settings/config.json",
     )
     args = vars(arg_parser.parse_args())
+    start_date_string = args["start_date"]
+    end_date_string = args["end_date"]
     config_path = args["config"]
 
+    # Blurb
     fancy_print("", form="LINE")
     fancy_print("Nova PM Sensor To InfluxDB v2.0", form="TITLE")
     fancy_print(f"Author:  {__author__}")
@@ -151,8 +209,25 @@ if __name__ == "__main__":
     fancy_print(f"License: {__license__}")
     fancy_print("", form="LINE")
 
+    # Get dates
+    if "N/A" in [start_date_string, end_date_string]:
+        raise ValueError(
+            "One or more required dates not provided, "
+            "please provide start (-s) and end (-e) date as arguments"
+        )
+    start_date = parse_date_string(start_date_string)
+    end_date = parse_date_string(end_date_string)
+    time_config = TimeCalculator(start_date, end_date)
+    number_of_years = time_config.year_difference()
+
+    fancy_print(f"Start: {start_date.strftime('%Y-%m-%d')}")
+    fancy_print(f"End: {end_date.strftime('%Y-%m-%d')}")
+    fancy_print(f"Iterating over {number_of_years} years")
+    fancy_print("", form="LINE")
+
+    # Read config file
     config_settings = get_json(config_path)
-    fancy_print(f"Exported settings from {config_path}")
+    fancy_print(f"Imported settings from {config_path}")
     fancy_print("", form="LINE")
 
     # Debug stats
@@ -171,10 +246,25 @@ if __name__ == "__main__":
     #influx = InfluxWriter(config_settings)
 
     # Get metadata from AURN
+    fancy_print(f"Downloading metadata from DEFRA...", end="\r", flush=True)
     aurn = AURNAPI(config_settings)
-    aurn.get_metadata(dt.datetime(2016, 1, 1).year, dt.datetime(2021, 1, 1).year)
+    aurn.get_metadata(start_date.year, end_date.year)
+    fancy_print(f"{len(aurn.metadata)} stations measuring within date range")
+    if config_settings["Debug Stats"]:
+        for station in aurn.metadata:
+            fancy_print(
+                    f"{station['tags']['Site Name']}: "
+                    f"{station['tags']['Download Code']}"
+                    )
+    fancy_print("", form="LINE")
 
-    # Loop over years
+    # Loop over station, then years
+    for station in aurn.metadata:
+        for year_offset in range(0, number_of_years):
+            year = start_date.year + year_offset
+            
+
+
 #    for csv in csv_files:
 #        if csv in exported_files:
 #            continue
