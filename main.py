@@ -237,7 +237,7 @@ if __name__ == "__main__":
         fancy_print(f"config.json", form="TITLE")
         for key, item in config_settings.items():
             if len(str(item)) > 40:
-                item = f"{item[:40]}..."
+                item = f"{str(item)[:40]}..."
             fancy_print(f"{key}: {item}")
         fancy_print(f"")
         fancy_print("", form="LINE")
@@ -262,6 +262,11 @@ if __name__ == "__main__":
     for station in aurn.metadata:
         for year_offset in range(0, number_of_years):
             year = start_date.year + year_offset
+            aurn.get_csv_measurements(
+                    station['tags']['Download Code'],
+                    year
+                    )
+    print(aurn.temp_columns)
             
 
 

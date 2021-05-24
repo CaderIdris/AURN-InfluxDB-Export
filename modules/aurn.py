@@ -24,6 +24,56 @@ import requests as req
 from lxml import html  # Needed to scrape AURN website for metadata
 import pandas as pd
 import datetime as dt 
+import urllib  # Needed for pandas error when csv not present
+
+def remove_brackets(string_with_brackets):
+    """ Removes brackets and the content within them from an input string
+
+    Iterates over an input string character by character, adding characters to
+    a new string until an open bracket is encountered. Once it is, characters
+    aren't added to new string until a matching closing bracket is encountered.
+
+    Keyword arguments:
+        string_with_brackets (str): An input string, presumably with brackets
+
+    Variables:
+        bracket_pairs (dict): Keys represent open brackets, items are their 
+        matching closers
+
+        unbracketed (bool): Is character outside a bracket?
+
+    Returns:
+        Input string with brackets removes
+
+    """
+
+    bracket_pairs = {
+            "(": ")",
+            "[": "]",
+            "{": "}",
+            "<": ">"
+            }
+    open_brackets = list(bracket_pairs.keys())
+
+    clean_string = ""
+    unbracketed = True
+    close_bracket = ""
+    for character in string_with_brackets:
+        if character in open_brackets:
+            unbracketed = False
+            close_bracket = bracket_pairs[character]
+        if unbracketed:        
+            clean_string = f"{clean_string}{character}"
+        if not unbracketed and character == close_bracket:
+            unbracketed = True
+
+    # Sometimes removing brackets leaves trailing spaces. This removes them.
+    while clean_string[-1] == " ":
+        clean_string = clean_string[:-1]
+
+    return clean_string
+
+
 
 class AURNAPI:
     """ Handles communication with the AURN/DEFRA website to get metadata
@@ -36,6 +86,9 @@ class AURNAPI:
         AURN sites that were active in the specified data range, split in to
         "tags" for all text info (Site Name etc) and "fields" for location 
         info (Latitude etc)
+
+        measurement_csv (DataFrame): Most recent measurements downloaded
+        from AURN
 
     Methods:
         get_metadata: Download a csv file containing info on all AURN sites,
@@ -54,6 +107,9 @@ class AURNAPI:
         """
         self.config = config
         self.metadata = list()
+        self.measurement_csv = pd.DataFrame()
+
+        self.temp_columns = list()
 
     def get_metadata(self, start_year, end_year):
         """ Downloads metadata from AURN/DEFRA website
@@ -111,7 +167,7 @@ class AURNAPI:
             site_info_link_xpath (list): List of all links in tbale on 
             site_info_html_page
 
-            download_url (str): Download url for measurement csvs
+            download_code (str): Download url for measurement csvs
 
         """
 
@@ -124,7 +180,7 @@ class AURNAPI:
                 headers={"User-Agent": self.config['User Agent']}
                 )
         metadata_html_source = html.fromstring(metadata_html_page.content)
-        
+                
         # Search HTML file for link to csv metadata using xpath
         metadata_csv_link = metadata_html_source.xpath(
                 self.config["XPath to CSV"]
@@ -156,7 +212,7 @@ class AURNAPI:
                         "%Y-%m-%d"
                         ).year
             else:
-                site_end_year = dt.datetime.now().year + 1
+                site_end_year = dt.datetime.now().year + 1     
 
             start_year_in_range = (site_start_year <= start_year <= site_end_year)
             end_year_in_range = (site_start_year <= end_year <= site_end_year)
@@ -189,11 +245,11 @@ class AURNAPI:
                     self.config["XPath to Code"]
                     )
             for site_info_link in site_info_link_xpath:
-                download_url = None
-                if self.config['AURN Data Link'] in site_info_link:
-                    download_url = site_info_link
+                download_code = None
+                if self.config['AURN Site Code Link'] in site_info_link:
+                    download_code = site_info_link.split('=')[1]
                     continue
-            if download_url is not None:
+            if download_code is not None:
                 self.metadata.append(
                         {
                         "tags": {
@@ -203,7 +259,7 @@ class AURNAPI:
                             "Site Name": row["Site Name"],
                             "Environment Type": row["Environment Type"],
                             "Zone": row["Zone"],
-                            "Download URL": download_url
+                            "Download Code": download_code
                             },
                         "fields": {
                             "Latitude": float(row["Latitude"]),
@@ -215,4 +271,51 @@ class AURNAPI:
                         }
                     )
 
+    def get_csv_measurements(self, download_code, year):
+        # Generate url to measurement csv and download
+        csv_url = (
+                f"{self.config['AURN Domain']}/"
+                f"{self.config['AURN Data Link']}/"
+                f"{download_code}_{year}.csv"
+                )
+        try:
+            raw_csv = pd.read_table(csv_url, sep=",", skiprows=4, low_memory=False)
+        except urllib.error.HTTPError:
+            # If data can't be found, quit out and move on
+            self.measurement_csv = pd.DataFrame()
+            return None
         
+        # Remove brackets from columns
+        # Some csv files have brackets in their pollutant names (e.g 
+        # PM<sub>10</sub>) while some don't. Removing the brackets
+        # standardises this
+        raw_columns = list(raw_csv.columns)
+        debracketed_columns = {}
+        for column in raw_columns:
+            if any(bracket in column for bracket in ["(", "{", "[", "<"]):
+                debracketed_columns[column] = remove_brackets(column)
+        if len(debracketed_columns.keys()) > 0:
+            raw_csv = raw_csv.rename(columns=debracketed_columns)
+        
+        # Get valid columns
+        raw_columns = raw_csv.columns
+        pollutants = list()
+        allowed_pollutants = self.config["Pollutants"]
+        for column in raw_columns:
+            if not any(tag in column for tag in ["unit.", "status."]):
+                pollutant_allowed = (
+                    column in allowed_pollutants 
+                    or len(allowed_pollutants) == 0 
+                        )
+                if pollutant_allowed:
+                    pollutants.append(column)
+
+        # Get indices of valid columns
+        indices = list()
+        for pollutant in pollutants:
+            indices.append(list(raw_columns).index(pollutant))
+        print(indices)
+        self.temp_columns.extend(pollutants)
+        self.temp_columns = list(set(self.temp_columns))
+
+
