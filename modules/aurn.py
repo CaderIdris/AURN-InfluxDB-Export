@@ -25,6 +25,9 @@ from lxml import html  # Needed to scrape AURN website for metadata
 import pandas as pd
 import datetime as dt
 import urllib  # Needed for pandas error when csv not present
+from collections import defaultdict  # Easier to work with that dict
+
+import time
 
 
 def remove_brackets(string_with_brackets):
@@ -87,8 +90,9 @@ class AURNAPI:
         "tags" for all text info (Site Name etc) and "fields" for location
         info (Latitude etc)
 
-        measurement_csv (DataFrame): Most recent measurements downloaded
-        from AURN
+        measurement_csvs (defaultdict): Contains all measurements downloaded,
+        split by year and then by station. This should be reset regularly
+        using clear_measurements to prevent memory issues
 
     Methods:
         get_metadata: Download a csv file containing info on all AURN sites,
@@ -96,6 +100,10 @@ class AURNAPI:
         for the site (A 2-4 character code that is used in the download url
         for the measurement csvs) and put metadata and download code in to a
         dictionary that gets put in to a list
+
+        get_csv_measurements: Download measurements from AURN
+
+        clear_measurements: Clear measurement_csvs
 
     """
     def __init__(self, config):
@@ -107,9 +115,7 @@ class AURNAPI:
         """
         self.config = config
         self.metadata = list()
-        self.measurement_csv = pd.DataFrame()
-
-        self.temp_columns = list()
+        self.measurement_csvs = defaultdict(dict)
 
     def get_metadata(self, start_year, end_year):
         """ Downloads metadata from AURN/DEFRA website
@@ -307,23 +313,71 @@ class AURNAPI:
 
         # Get valid columns
         raw_columns = raw_csv.columns
-        pollutants = list()
+        raw_columns_list = list(raw_columns)
+        pollutants_to_remove = list()
         allowed_pollutants = self.config["Pollutants"]
-        for column in raw_columns:
-            if not any(tag in column for tag in ["unit.", "status."]):
-                pollutant_allowed = (
-                    column in allowed_pollutants
-                    or len(allowed_pollutants) == 0
-                        )
-                if pollutant_allowed:
-                    pollutants.append(column)
+        for column in raw_columns_list:
+            pollutant_not_allowed = (
+                column not in allowed_pollutants
+                and len(allowed_pollutants) != 0
+                and not any(tag in column for tag in [
+                        "unit", "status", "Date", "time"
+                        ])
+                    )
+            if pollutant_not_allowed:
+                pollutants_to_remove.append(column)
 
-        # Get indices of valid columns
+        # Get indices of invalid columns and remove
         indices = list()
-        for pollutant in pollutants:
-            indices.append(list(raw_columns).index(pollutant))
-        print(indices)
-        self.temp_columns.extend(pollutants)
-        self.temp_columns = list(set(self.temp_columns))
+        for pollutant in pollutants_to_remove:
+            indices.append(raw_columns_list.index(pollutant))
+        indices.sort(reverse=True)
+        columns_to_drop = list()
+        for index in indices:
+            column_names = [raw_columns_list[index + offset] for offset in
+                            range(0, 3)]
+            columns_to_drop.extend(column_names)
+        if len(columns_to_drop) > 0:
+            raw_csv = raw_csv.drop(columns_to_drop, axis=1)
 
+        # Turn two date and time columns to datetime
+        dt_col = pd.to_datetime(raw_csv.pop('Date'), format='%d-%m-%Y') + \
+            pd.to_timedelta(raw_csv.pop('time') + ':00')
+        dt_col = dt_col.rename('Datetime')
+        raw_csv = pd.concat([dt_col, raw_csv], axis=1)
+        raw_columns_list = list(raw_csv.columns)
+
+        # Make a new csv that looks nicer
+        if (len(raw_columns_list) - 1) % 3 == 0:
+            measurement_csv_data = dict()
+            measurement_csv_data['Datetime'] = list(raw_csv['Datetime'])
+            non_datetime_columns = int((len(raw_columns_list) - 1) / 3)
+            for column_index_raw in range(0, non_datetime_columns):
+                column_index = (column_index_raw * 3) + 1
+                unit_column = list(raw_csv.iloc[:, column_index + 2])
+                unit_column = list(set(unit_column))
+                if 'nan' in unit_column:
+                    unit_column.pop('nan')
+                if len(unit_column) > 0:
+                    unit = unit_column[0]
+                else:
+                    unit = 'nan'
+                if unit != 'nan':
+                    measurement_csv_data[f'{raw_columns_list[column_index]}'
+                                         f'{unit}'] = list(raw_csv[
+                                             raw_columns_list[column_index]])
+                    measurement_csv_data[f'{raw_columns_list[column_index]}'
+                                         f' status'] = list(raw_csv[
+                                             raw_columns_list[column_index+1]])
+                    measurement_csv = pd.DataFrame(data=measurement_csv_data)
+                    self.measurement_csvs[year][download_code] = (
+                            measurement_csv
+                            )
+
+
+
+
+#        for index, row in raw_csv.iterrows():
+#            print(row[0])
+#            time.sleep(10)
 
