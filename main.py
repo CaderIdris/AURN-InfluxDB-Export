@@ -18,6 +18,7 @@ from modules.timetools import TimeCalculator
 from modules.aurn import AURNAPI
 from modules.influxwrite import InfluxWriter
 
+
 def parse_date_string(dateString):
     """Parses input strings in to date objects
 
@@ -42,9 +43,9 @@ def parse_date_string(dateString):
             "%Y/%m",
             "%Y\\%m",
             "%Y.%m.%d",
-            "%Y-%m-%d", 
-            "%Y/%m/%d", 
-            "%Y\\%m\\%d", 
+            "%Y-%m-%d",
+            "%Y/%m/%d",
+            "%Y\\%m\\%d",
             "%Y.%m.%d"
             ]
     for fmt in parsableFormats:
@@ -232,21 +233,21 @@ if __name__ == "__main__":
 
     # Debug stats
     if config_settings["Debug Stats"]:
-        fancy_print(f"DEBUG STATS", form="TITLE")
-        fancy_print(f"")
-        fancy_print(f"config.json", form="TITLE")
+        fancy_print("DEBUG STATS", form="TITLE")
+        fancy_print("")
+        fancy_print("config.json", form="TITLE")
         for key, item in config_settings.items():
             if len(str(item)) > 40:
                 item = f"{str(item)[:40]}..."
             fancy_print(f"{key}: {item}")
-        fancy_print(f"")
+        fancy_print("")
         fancy_print("", form="LINE")
 
     # Connect to InfluxDB 2.0 Datakjkjbase
     #influx = InfluxWriter(config_settings)
 
     # Get metadata from AURN
-    fancy_print(f"Downloading metadata from DEFRA...", end="\r", flush=True)
+    fancy_print("Downloading metadata from DEFRA...", end="\r", flush=True)
     aurn = AURNAPI(config_settings)
     aurn.get_metadata(start_date.year, end_date.year)
     fancy_print(f"{len(aurn.metadata)} stations measuring within date range")
@@ -267,7 +268,7 @@ if __name__ == "__main__":
                     year
                     )
     print(aurn.temp_columns)
-            
+
 
 
 #    for csv in csv_files:
@@ -290,4 +291,3 @@ if __name__ == "__main__":
 #            exported_files_txt.write(f"{csv}\n")
 #    fancy_print("", form="LINE")
 #
-        
