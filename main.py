@@ -170,21 +170,21 @@ def get_json(pathToJson):
 if __name__ == "__main__":
     # Parse incoming arguments
     arg_parser = argparse.ArgumentParser(
-        description="Parses measurements from Nova PM csvs "
-        "and writes it to an InfluxDB 2.0 database."
+        description="Downloads measurements from AURN "
+        "and exports them to an InfluxDB 2.0 database."
     )
     arg_parser.add_argument(
         "-s",
         "--start-date",
         type=str,
-        help="Date to start data export from",
+        help="Year to start data export from",
         default="N/A",
     )
     arg_parser.add_argument(
         "-e",
         "--end-date",
         type=str,
-        help="Date to end data export, this date is not included in output",
+        help="Year to end data export",
         default="N/A",
     )
     arg_parser.add_argument(
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
     # Blurb
     fancy_print("", form="LINE")
-    fancy_print("Nova PM Sensor To InfluxDB v2.0", form="TITLE")
+    fancy_print("AURN Measurements To InfluxDB v2.0", form="TITLE")
     fancy_print(f"Author:  {__author__}")
     fancy_print(f"Contact: {__email__}")
     fancy_print(f"Version: {__version__}")
@@ -213,8 +213,8 @@ if __name__ == "__main__":
     # Get dates
     if "N/A" in [start_date_string, end_date_string]:
         raise ValueError(
-            "One or more required dates not provided, "
-            "please provide start (-s) and end (-e) date as arguments"
+            "One or more required years not provided, "
+            "please provide start (-s) and end (-e) year as arguments"
         )
     start_date = parse_date_string(start_date_string)
     end_date = parse_date_string(end_date_string)
