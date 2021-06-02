@@ -9,16 +9,19 @@ measurements
     Classes:
         AURNAPI: Handles communication with the AURN/DEFRA website to get
         metadata and measurements
+
+    Functions:
+        remove_brackets: Removes brackets and their contents from a string
 """
 
 __author__ = "Joe Hayward"
 __copyright__ = "2021, Joe Hayward"
 __credits__ = ["Joe Hayward"]
 __license__ = "GNU General Public License v3.0"
-__version__ = "0.1"
+__version__ = "Beta 1.0"
 __maintainer__ = "Joe Hayward"
 __email__ = "j.d.hayward@surrey.ac.uk"
-__status__ = "Alpha"
+__status__ = "Beta"
 
 import requests as req
 from lxml import html  # Needed to scrape AURN website for metadata
@@ -26,8 +29,6 @@ import pandas as pd
 import datetime as dt
 import urllib  # Needed for pandas error when csv not present
 from collections import defaultdict  # Easier to work with that dict
-
-import time
 
 
 def remove_brackets(string_with_brackets):
@@ -91,8 +92,13 @@ class AURNAPI:
         info (Latitude etc)
 
         measurement_csvs (defaultdict): Contains all measurements downloaded,
-        split by year and then by station. This should be reset regularly
-        using clear_measurements to prevent memory issues
+        split by year and then by station. This should be cleared regularly
+        using clear_measurement_csvs to prevent memory issues
+
+        measurement_jsons: Contains all measurement json lists ready to be
+        exported to InfluxDB 2.x instance, split by year then by station.
+        Should be cleared regularly using clear_measurtement_jsons to 
+        prevent memory issues
 
     Methods:
         get_metadata: Download a csv file containing info on all AURN sites,
@@ -517,17 +523,54 @@ class AURNAPI:
         for index, row in csv_file.iterrows():
             measurement_container = metadata.copy()
             measurement_container["time"] = row["Datetime"].to_pydatetime()
-            measurement_container["measurement"] = "Automatic Urban Rural Network"
+            measurement_container["measurement"] = (
+                    "Automatic Urban Rural Network"
+                    )
             for m_column in measurement_columns:
                 measurement_container["fields"][m_column] = row[m_column]
             for s_column in status_columns:
                 measurement_container["tags"][s_column] = row[s_column]
             self.measurement_jsons.append(measurement_container)
 
+    def csv_as_text(self, download_code, year):
+        """ Return dataframe as text
+
+        Keyword Arguments:
+            download_code (str): Used to locate DataFrame
+
+            year (str): Used to locate DataFrame
 
 
+        Returns:
+            String representation of csv, or blank string if no csv
+            present
+        """
+        if self.measurement_csvs[year][download_code] is not None:
+            return self.measurement_csvs[year][download_code].to_csv()
+        else:
+            return ""
 
-#        for index, row in raw_csv.iterrows():
-#            print(row[0])
-#            time.sleep(10)
+    def csv_save(self, path, download_code, year):
+        """ Save csv file to path
 
+        Keyword Arguments:
+            path (str): Path to save csv to
+
+            download_code (str): Used to locate DataFrame
+
+            year (str): Used to locate DataFrame
+        """
+        if self.measurement_csvs[year][download_code] is not None:
+            self.measurement_csvs[year][download_code].to_csv(
+                    path_or_buf=path
+                    )
+
+    def clear_measurement_csvs(self):
+        """ Clear measurement_csvs to reduce memory usage
+        """
+        self.measurement_csvs = defaultdict(dict)
+
+    def clear_measurement_jsons(self):
+        """ Clear measurement_jsons to reduce memory usage
+        """
+        self.measurement_jsons = defaultdict(dict)
