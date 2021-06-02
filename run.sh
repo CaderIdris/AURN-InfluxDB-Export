@@ -2,4 +2,9 @@
 
 venv=venv/bin/python3
 
-$venv main.py -s 2018 -e 2022
+echo "Start Year? (YYYY): "
+read startdate
+echo "End Year? (YYYY): "
+read enddate
+
+$venv main.py -s startdate -e enddate

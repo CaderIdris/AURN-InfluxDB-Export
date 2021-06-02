@@ -280,25 +280,3 @@ if __name__ == "__main__":
             aurn.clear_measurement_csvs()
             aurn.clear_measurement_jsons()
         fancy_print(f"{station['tags']['Site Name']} Finished")
-
-
-#    for csv in csv_files:
-#        if csv in exported_files:
-#            continue
-#            # if the csv file has already been exported, skip it
-#        fancy_print(f"Analysing {csv}", end="\r", flush=True)
-#        nova = NovaPM(f"{config_settings['File Path']}/{csv}")
-#        if nova.column_number == 8:
-#            nova.old_format()
-#        elif nova.column_number == 4:
-#            nova.new_format()
-#        else:
-#            continue
-#        fancy_print(f"Uploading {csv}: {len(nova.json_list)}", end="\r", flush=True)
-#        influx.write_container_list(nova.json_list)
-#        fancy_print(f"Exported {csv}")
-#        with open(f"{config_settings['File Path']}/ExportedFiles.txt", 
-#                "a") as exported_files_txt:
-#            exported_files_txt.write(f"{csv}\n")
-#    fancy_print("", form="LINE")
-#

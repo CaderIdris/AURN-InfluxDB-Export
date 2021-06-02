@@ -1,7 +1,7 @@
 AURN API
 ---
 
-**WIP**
+**BETA**
 
 **Joe Hayward (j.d.hayward@surrey.ac.uk)**
 
@@ -29,6 +29,7 @@ This program was designed, tested and run on Ubuntu 21.04. It will very likely r
 
 This program is initialised via the terminal:
 - `bash run.sh` or `./run.sh` 
+It then asks for a start year and end year in YYYY format. Some other formats can be used though are not recommended as only the year will be examined.
 Once the program is initialised, the opening blurb will show. If Debug Stats is set to true, it will display all information contained in config.json
 
 ---
@@ -38,7 +39,7 @@ Once the program is initialised, the opening blurb will show. If Debug Stats is 
 ### config.json
 
 config.json contains several configurable parameters for the program:
-- TBA
+- 
 
 ---
 
