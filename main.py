@@ -16,7 +16,7 @@ import datetime as dt
 
 from modules.timetools import TimeCalculator
 from modules.aurn import AURNAPI
-from modules.influxwrite import InfluxWriter
+#from modules.influxwrite import InfluxWriter
 
 
 def parse_date_string(dateString):
@@ -261,13 +261,15 @@ if __name__ == "__main__":
 
     # Loop over station, then years
     for station in aurn.metadata:
-        for year_offset in range(0, number_of_years):
+        for year_offset in range(0, number_of_years + 1):
+            # Download csv measurements
             year = start_date.year + year_offset
-            aurn.get_csv_measurements(
-                    station['tags']['Download Code'],
-                    year
-                    )
-    print(aurn.temp_columns)
+            download_code = station['tags']['Download Code']
+            aurn.get_csv_measurements(download_code, year)
+            if aurn.measurement_csvs[year][download_code] is None:
+                continue  # If the csv couldn't be found, skip
+            # Reformat csv to json list
+            aurn.csv_to_json_list(station, download_code, year)
 
 
 

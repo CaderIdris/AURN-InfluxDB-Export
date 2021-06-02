@@ -101,9 +101,19 @@ class AURNAPI:
         for the measurement csvs) and put metadata and download code in to a
         dictionary that gets put in to a list
 
-        get_csv_measurements: Download measurements from AURN
+        get_csv_measurements: Download measurements from AURN and formats csvs
+        in to nicer format for machine reading
 
-        clear_measurements: Clear measurement_csvs
+        csv_to_json_list: Converts csvs to list of jsons to be exported to
+        InfluxDB v2.0 instance
+
+        csv_as_text: Returns csv as text file for writing
+
+        csv_save: Saves csv measurements to path
+
+        clear_measurement_csvs: Clear measurement_csvs
+
+        clear_measurement_jsons: Clear measurement_jsons
 
     """
     def __init__(self, config):
@@ -116,6 +126,7 @@ class AURNAPI:
         self.config = config
         self.metadata = list()
         self.measurement_csvs = defaultdict(dict)
+        self.measurement_jsons = defaultdict(dict)
 
     def get_metadata(self, start_year, end_year):
         """ Downloads metadata from AURN/DEFRA website
@@ -409,7 +420,7 @@ class AURNAPI:
             raw_csv = raw_csv.rename(columns=debracketed_columns)
 
         # Get valid columns
-        raw_columns_list = list(raw_columns)
+        raw_columns_list = list(raw_csv.columns)
         pollutants_to_remove = list()
         allowed_pollutants = self.config["Pollutants"]
         for column in raw_columns_list:
@@ -463,7 +474,55 @@ class AURNAPI:
                 self.measurement_csvs[year][download_code] = (
                         measurement_csv
                         )
-                print(measurement_csv)
+
+    def csv_to_json_list(self, metadata, download_code, year):
+        """ Converts the formatted csv in to a list of jsons which can be
+        exported to an InfluxDB 2.x database.
+        
+        Takes the csv formatted in get_csv_measurements and the metadata
+        downloaded in get_metadata and stores it in a list of jsons that
+        can be exported to an InfluxDB 2.0 database
+
+        Keyword Arguments:
+            metadata (dict): Metadata for station, contains tags and fields
+            for InfluxDB
+
+            download_code (str): The download code for the site, used to find
+            csv in measurement_csvs
+
+            year (str): The year the measurements were made
+
+        Variables:
+            csv_file (DataFrame): The csv to be converted to json list
+
+            column_name_list (list): List of column names in csv
+
+            status_columns (list): Names of all status and unit columns
+
+            measurement_columns (list): Names of all measurement columns
+
+            measurement_container (dict): Dict in the format that InfluxDB
+            recognises for data export
+        """
+        csv_file = self.measurement_csvs[year][download_code]
+        column_name_list = list(csv_file.columns)
+        status_columns = list()
+        measurement_columns = list()
+        self.measurement_jsons[year][download_code] = list()
+        for column in column_name_list:
+            if any(tag in column for tag in ["status", "unit"]):
+                status_columns.append(column)
+            elif "Datetime" not in column:
+                measurement_columns.append(column)
+        for index, row in csv_file.iterrows():
+            measurement_container = metadata.copy()
+            measurement_container["time"] = row["Datetime"].to_pydatetime()
+            measurement_container["measurement"] = "Automatic Urban Rural Network"
+            for m_column in measurement_columns:
+                measurement_container["fields"][m_column] = row[m_column]
+            for s_column in status_columns:
+                measurement_container["tags"][s_column] = row[s_column]
+            self.measurement_jsons.append(measurement_container)
 
 
 
