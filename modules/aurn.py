@@ -285,6 +285,98 @@ class AURNAPI:
                     )
 
     def get_csv_measurements(self, download_code, year):
+        """ Download csvs from AURN website, remove unwanted pollutants and
+        reformat them in to a prettier format
+
+        All measurements made by the AURN are stored on their website in
+        a preformatted csv. The first stage of this method downloads the csv
+        from the data link, appending {Download Code}_{Year}.csv to the end
+        to get the measurements for that site for that year in csv format.
+        If no data can be found, None is recorded instead of a dataframe
+        and the method quits early.
+
+        The second stage of the method involves making the data look nicer.
+        Some of the measurement columns include brackets in their names
+        (e.g. PM<sub>10</sub>) which are used to render subscript for 
+        pollutants when viewed as HTML, some include info on the instrument
+        used (e.g (FIDAS)) but not all sites use the same identifiers.
+        To maintain standardisation, this info is removed.
+
+        The third stage then removes all unwanted pollutants. If no pollutants
+        are listed in the config, all are kept. Otherwise, all pollutants not
+        listed are removed, as well as their associated unit and status
+        columns.
+
+        The fourth stage converts the time and date columns in to a single
+        datetime object. However, the timestamps used by the AURN do not
+        conform to ISO8601 or any RFC standard that I could find, they
+        appear to be legacy so as to maintain consistency between all csvs.
+        Their format is YYYY-MM-DD in 'Date' and HH:MM in 'time'. :00 has
+        to be appended to the time column to give it in seconds, otherwise
+        pandas will not recognise it. The time has to be converted in to a
+        timedelta object and added to the date column (which assumes the time
+        is 00:00:00 in absence of a time string to get the correct time as the
+        date parser does not understand 24 as a valid hour, which the AURN
+        uses instead of 00 the next day for midnight.
+
+        The final stage makes a nicer formatted csv. The AURN csvs do not 
+        distinguish between status and unit columns for different pollutants
+        (e.g unit columns for NO2 and PM2.5 both have the heading "unit"),
+        so the pollutant is prepended on them to make it easier to distinguish
+        them. Otherwise, the only distinctions can be made by their position.
+        The date and time columns are then replaced with a single datetime 
+        columns containing a datetime object. This csv is then added to
+        the measurement_csvs dict, nested by year and then by download code.
+        
+        Keyword arguments:
+            download_code (str): The download code found during the metadata
+            search
+
+            year (str): The year you want to download data for, YYYY format
+
+        Variables:
+            csv_url (str): The url to the formatted csv provided by the AURN
+
+            raw_csv (DataFrame): Formatted csv obtained from AURN website
+
+            raw_columns_list (list): All column names in AURN csv file, this
+            list is regenerated a few times and may differ
+
+            debracketed_columns (dict): In order to bulk rename the columns, a
+            dictionary can be passed in to the pd.rename function to change
+            them all at once. The key is the original name and the value is the
+            new one, in this case the original name with brackets and their
+            contents removed
+
+            pollutants_to_remove (list): A list containing all pollutants not
+            listed in the config as pollutants required by the program
+
+            allowed_pollutants (list): Pollutants specified in the config to
+            keep. If empty, all pollutants are kept
+
+            pollutant_not_allowed (bool): Determines if a specified pollutant
+            should be kept (False) or removed (True). Auto falses if column is
+            unit, status, Date, Time or if the allowed_pollutants list is
+            empty
+
+            indices (list): List of indices of the columns to be removed.
+            Sorted in descending order so the indices of later columns in
+            the list don't change when earlier ones are removed
+
+            columns_to_drop (list): Names of the columns to be removed
+
+            column_names (list): Names of the columns of pollutants to be
+            removed, as well as their associated status and unit columns which
+            are 1 and 2 indices higher respectively
+
+            dt_col (pd.Series): The new Datetime column, a combination of the
+            'Date' and 'time' columns in datetime format
+
+            measurement_csv_data (dict): Dict of lists that represent the data
+            to be put in the new csv, keys are the column headers
+
+            measurement_csb (DataFrame): The new, formatted csv
+        """
         # Generate url to measurement csv and download
         csv_url = (
                 f"{self.config['AURN Domain']}/"
@@ -296,23 +388,22 @@ class AURNAPI:
                                     low_memory=False)
         except urllib.error.HTTPError:
             # If data can't be found, quit out and move on
-            self.measurement_csv = pd.DataFrame()
+            self.measurement_csvs[year][download_code] = None
             return None
 
         # Remove brackets from columns
         # Some csv files have brackets in their pollutant names (e.g
         # PM<sub>10</sub>) while some don't. Removing the brackets
         # standardises this
-        raw_columns = list(raw_csv.columns)
+        raw_columns_list = list(raw_csv.columns)
         debracketed_columns = {}
-        for column in raw_columns:
+        for column in raw_columns_list:
             if any(bracket in column for bracket in ["(", "{", "[", "<"]):
                 debracketed_columns[column] = remove_brackets(column)
         if len(debracketed_columns.keys()) > 0:
             raw_csv = raw_csv.rename(columns=debracketed_columns)
 
         # Get valid columns
-        raw_columns = raw_csv.columns
         raw_columns_list = list(raw_columns)
         pollutants_to_remove = list()
         allowed_pollutants = self.config["Pollutants"]
@@ -354,25 +445,20 @@ class AURNAPI:
             non_datetime_columns = int((len(raw_columns_list) - 1) / 3)
             for column_index_raw in range(0, non_datetime_columns):
                 column_index = (column_index_raw * 3) + 1
-                unit_column = list(raw_csv.iloc[:, column_index + 2])
-                unit_column = list(set(unit_column))
-                if 'nan' in unit_column:
-                    unit_column.pop('nan')
-                if len(unit_column) > 0:
-                    unit = unit_column[0]
-                else:
-                    unit = 'nan'
-                if unit != 'nan':
-                    measurement_csv_data[f'{raw_columns_list[column_index]}'
-                                         f'{unit}'] = list(raw_csv[
-                                             raw_columns_list[column_index]])
-                    measurement_csv_data[f'{raw_columns_list[column_index]}'
-                                         f' status'] = list(raw_csv[
-                                             raw_columns_list[column_index+1]])
-                    measurement_csv = pd.DataFrame(data=measurement_csv_data)
-                    self.measurement_csvs[year][download_code] = (
-                            measurement_csv
-                            )
+                measurement_csv_data[f'{raw_columns_list[column_index]}'
+                                     ] = list(raw_csv[
+                                         raw_columns_list[column_index]])
+                measurement_csv_data[f'{raw_columns_list[column_index]}'
+                                     f' status'] = list(raw_csv[
+                                         raw_columns_list[column_index+1]])
+                measurement_csv_data[f'{raw_columns_list[column_index]}'
+                                     f' unit'] = list(raw_csv[
+                                         raw_columns_list[column_index+2]])
+                measurement_csv = pd.DataFrame(data=measurement_csv_data)
+                self.measurement_csvs[year][download_code] = (
+                        measurement_csv
+                        )
+                print(measurement_csv)
 
 
 
