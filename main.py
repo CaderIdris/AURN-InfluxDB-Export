@@ -5,10 +5,10 @@ __author__ = "Joe Hayward"
 __copyright__ = "2021, Joe Hayward"
 __credits__ = ["Joe Hayward"]
 __license__ = "GNU General Public License v3.0"
-__version__ = "0.1"
+__version__ = "Beta 1.0"
 __maintainer__ = "Joe Hayward"
 __email__ = "j.d.hayward@surrey.ac.uk"
-__status__ = "Alpha"
+__status__ = "Beta"
 
 import argparse
 import json
@@ -16,7 +16,7 @@ import datetime as dt
 
 from modules.timetools import TimeCalculator
 from modules.aurn import AURNAPI
-#from modules.influxwrite import InfluxWriter
+from modules.influxwrite import InfluxWriter
 
 
 def parse_date_string(dateString):
@@ -243,8 +243,8 @@ if __name__ == "__main__":
         fancy_print("")
         fancy_print("", form="LINE")
 
-    # Connect to InfluxDB 2.0 Datakjkjbase
-    #influx = InfluxWriter(config_settings)
+    # Connect to InfluxDB 2.0 Database
+    influx = InfluxWriter(config_settings)
 
     # Get metadata from AURN
     fancy_print("Downloading metadata from DEFRA...", end="\r", flush=True)
@@ -265,12 +265,21 @@ if __name__ == "__main__":
             # Download csv measurements
             year = start_date.year + year_offset
             download_code = station['tags']['Download Code']
+            fancy_print(f"Downloading data for {station['tags']['Site Name']}"
+                        f" ({year})", end="\r", flush=True)
             aurn.get_csv_measurements(download_code, year)
             if aurn.measurement_csvs[year][download_code] is None:
                 continue  # If the csv couldn't be found, skip
             # Reformat csv to json list
+            fancy_print(f"Exporting data for {station['tags']['Site Name']}"
+                        f" ({year})", end="\r", flush=True)
             aurn.csv_to_json_list(station, download_code, year)
-
+            influx.write_container_list(
+                    aurn.measurement_jsons[year][download_code]
+                    )
+            aurn.clear_measurement_csvs()
+            aurn.clear_measurement_jsons()
+        fancy_print(f"{station['tags']['Site Name']} Finished")
 
 
 #    for csv in csv_files:
