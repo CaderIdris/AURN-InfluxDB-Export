@@ -375,7 +375,12 @@ class AURNAPI:
             measurement_csv_data (dict): Dict of lists that represent the data
             to be put in the new csv, keys are the column headers
 
-            measurement_csb (DataFrame): The new, formatted csv
+            measurement_csv (DataFrame): The new, formatted csv
+
+        Returns:
+            Returns none if no csv can be found but this is only to exit the
+            method quickly without nesting a bunch of if statements and
+            making the code look messy
         """
         # Generate url to measurement csv and download
         csv_url = (
