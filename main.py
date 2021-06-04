@@ -269,6 +269,7 @@ if __name__ == "__main__":
                         f" ({year})", end="\r", flush=True)
             aurn.get_csv_measurements(download_code, year)
             if aurn.measurement_csvs[year][download_code] is None:
+                aurn.clear_measurement_csvs()
                 continue  # If the csv couldn't be found, skip
             # Reformat csv to json list
             fancy_print(f"Exporting data for {station['tags']['Site Name']}"
