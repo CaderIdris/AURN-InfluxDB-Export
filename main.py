@@ -1,14 +1,20 @@
-"""
+""" AURN to InfluxDB 2.x Export
+
+This tool takes measurements form the AURN using the AURN module and exports
+them to an InfluxDB 2.x database. As the AURN has no official Python API,
+this program hacks one together by scraping the HTML code of the website to
+obtain metadata and download csv measurements.
+
 """
 
-__author__ = "Joe Hayward"
-__copyright__ = "2021, Joe Hayward"
-__credits__ = ["Joe Hayward"]
+__author__ = "Idris Hayward"
+__copyright__ = "2021, Idris Hayward"
+__credits__ = ["Idris Hayward"]
 __license__ = "GNU General Public License v3.0"
-__version__ = "Beta 1.0"
-__maintainer__ = "Joe Hayward"
+__version__ = "1.0 RC"
+__maintainer__ = "Idris Hayward"
 __email__ = "j.d.hayward@surrey.ac.uk"
-__status__ = "Beta"
+__status__ = "Release Candidate"
 
 import argparse
 import json
@@ -281,3 +287,4 @@ if __name__ == "__main__":
             aurn.clear_measurement_csvs()
             aurn.clear_measurement_jsons()
         fancy_print(f"{station['tags']['Site Name']} Finished")
+    fancy_print("", form="LINE")

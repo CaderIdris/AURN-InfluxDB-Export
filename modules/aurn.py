@@ -14,14 +14,14 @@ measurements
         remove_brackets: Removes brackets and their contents from a string
 """
 
-__author__ = "Joe Hayward"
-__copyright__ = "2021, Joe Hayward"
-__credits__ = ["Joe Hayward"]
+__author__ = "Idris Hayward"
+__copyright__ = "2021, Idris Hayward"
+__credits__ = ["Idris Hayward"]
 __license__ = "GNU General Public License v3.0"
-__version__ = "Beta 1.0"
-__maintainer__ = "Joe Hayward"
+__version__ = "1.0 RC"
+__maintainer__ = "Idris Hayward"
 __email__ = "j.d.hayward@surrey.ac.uk"
-__status__ = "Beta"
+__status__ = "Release Candidate"
 
 import requests as req
 from lxml import html  # Needed to scrape AURN website for metadata
