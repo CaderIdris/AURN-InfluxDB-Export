@@ -477,9 +477,9 @@ class AURNAPI:
                                      f' unit'] = list(raw_csv[
                                          raw_columns_list[column_index+2]])
                 measurement_csv = pd.DataFrame(data=measurement_csv_data)
-                self.measurement_csvs[year][download_code] = (
+            self.measurement_csvs[year][download_code] = (
                         measurement_csv
-                        )
+                    )
 
     def csv_to_json_list(self, metadata, download_code, year):
         """ Converts the formatted csv in to a list of jsons which can be
@@ -514,25 +514,40 @@ class AURNAPI:
         column_name_list = list(csv_file.columns)
         status_columns = list()
         measurement_columns = list()
-        self.measurement_jsons[year][download_code] = list()
+        container_list = list()
         for column in column_name_list:
             if any(tag in column for tag in ["status", "unit"]):
                 status_columns.append(column)
             elif "Datetime" not in column:
                 measurement_columns.append(column)
         for index, row in csv_file.iterrows():
-            measurement_container = metadata.copy()
+            measurement_container = {'tags': {}, 'fields': {}}
             measurement_container["time"] = row["Datetime"].to_pydatetime()
             measurement_container["measurement"] = (
                     "Automatic Urban Rural Network"
                     )
             for m_column in measurement_columns:
-                measurement_container["fields"][m_column] = row[m_column]
+                try:
+                    measure = float(row[m_column])
+                    if measure != measure:
+                        continue
+                    measurement_container["fields"][m_column] = measure
+                except TypeError:
+                    continue
             for s_column in status_columns:
+                status = row[s_column]
+                if status == "":
+                    continue
                 measurement_container["tags"][s_column] = row[s_column]
-            self.measurement_jsons[year][download_code].append(
-                    measurement_container
+            for key, value in metadata['tags'].items():
+                measurement_container['tags'][key] = value
+            for key, value in metadata['fields'].items():
+                measurement_container['fields'][key] = value
+            container_list.append(
+                    measurement_container.copy()
                     )
+
+        self.measurement_jsons[year][download_code] = container_list
 
     def csv_as_text(self, download_code, year):
         """ Return dataframe as text
