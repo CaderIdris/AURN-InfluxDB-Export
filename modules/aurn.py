@@ -530,7 +530,9 @@ class AURNAPI:
                 measurement_container["fields"][m_column] = row[m_column]
             for s_column in status_columns:
                 measurement_container["tags"][s_column] = row[s_column]
-            self.measurement_jsons.append(measurement_container)
+            self.measurement_jsons[year][download_code].append(
+                    measurement_container
+                    )
 
     def csv_as_text(self, download_code, year):
         """ Return dataframe as text
