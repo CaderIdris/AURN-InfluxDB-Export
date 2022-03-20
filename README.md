@@ -40,7 +40,25 @@ Once the program is initialised, the opening blurb will show. If Debug Stats is 
 
 config.json contains several configurable parameters for the program:
 
-- TBA
+|Key|Type|Description|Options|
+|---|---|---|---|
+|*AURN Domain*|`str`|URL for the AURN website|Valid URL|
+|*AURN Metadata Search*|`str`|URN to query AURN metadata|Valid URN|
+|*AURN Site Info*|`str`|URN to prefix site info query|Valid URN|
+|*AURN Site Info Provider*|`str`|URN to prefix site info provider query|Valid URN|
+|*AURN Site Code Link*|`str`|URN to prefix site code query|Valid URN|
+|*AURN Data Link*|`str`|URN for site data download|Valid URN|
+|*XPath to CSV*|`str`|XPath to find CSV download link|Valid XPath|
+|*Xpath to Code*|`str`|XPath to find site code|Valid XPath|
+|*User Agent*|`str`|Valid user agent token. Required to communicate with AURN website, connection will fail otherwise|Valid user agent|
+|*Pollutants*|`list`|List of pollutants to download data for|List of pollutants, options at the end of README|
+|*Debug Stats*|`bool`|Print debug stats upon program init|true/false|
+|*Influx Bucket*|`str`|Bucket to export data to|Any valid bucket, can be blank if *Write to Influx* is false|
+|*Influx IP*|`str`|IP address of InfluxDB 2.x database|IP of database, localhost if hosted on same machine, can be blank if *Write to Influx* is false|
+|*Influx Port*|`str`|Port of InfluxDB 2.x database|Port of database (usually 8086), can be blank if *Write to Influx* is false|
+|*Influx Token*|`str`|Auth token for InfluxDB 2.x database|Auth token provided by your admin, can be blank if *Write to Influx* is false|
+|*Influx Organisation*|`str`|Organisation your token is associated with|Organisation associated with auth token, can be blank if *Write to Influx* is false|
+
 
 ---
 
