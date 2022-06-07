@@ -13,8 +13,8 @@ __credits__ = ["Idris Hayward"]
 __license__ = "GNU General Public License v3.0"
 __version__ = "1.0 RC"
 __maintainer__ = "Idris Hayward"
-__email__ = "j.d.hayward@surrey.ac.uk"
-__status__ = "Release Candidate"
+__email__ = "CaderIdrisGH@outlook.com"
+__status__ = "Stable Release"
 
 import argparse
 import json

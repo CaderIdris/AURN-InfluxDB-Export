@@ -1,13 +1,10 @@
-AURN API
+<h1 align="center">
+	AURN API
+</h1>
+
+**Contact**: CaderIdrisGH@outlook.com
+
 ---
-
-**BETA**
-
-**Joe Hayward (j.d.hayward@surrey.ac.uk)**
-
-**COPYRIGHT 2021, Joe Hayward**
-
-**GNU General Public License v3.0**
 
 This program was designed, tested and run on Ubuntu 21.04. It will very likely run on other Linux distributions though it has not been tested. This program has not been tested on Windows or MacOS.
 
