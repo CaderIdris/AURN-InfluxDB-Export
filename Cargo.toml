@@ -1,8 +1,18 @@
 [package]
-name = "AURN-InfuxDB-Export"
+name = "AURN_Measurements"
+description = "A CLI tool to download air quality data from the Automatic Urban and Rural Network"
 version = "0.1.0"
 edition = "2021"
+authors = ["Idris <CaderIdrisGH@outlook.com>"]
+readme = "README.md"
+license = "GPL-3.0"
+license_file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+csv = "1.1.6"
+reqwest = {version="0.11.11", features = ["blocking"]}
+scraper = "0.13.0"
+serde = { version="1.0.138", features=["derive"] }
+toml = "0.5.9"
