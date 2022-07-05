@@ -27,14 +27,8 @@ pub struct AURNMetadata {
 
 impl AURNMetadata {
 
-    pub fn new() -> Self {
-        let empty_vec: Vec<CSVRow> = Vec::new();
-        Self {
-            metadata: empty_vec
-        }
-    }
-
-    pub fn get_metadata(&mut self, query_url: &str, start_date: DateTime<Utc>, end_date: DateTime<Utc>) {
+    pub fn new(query_url: &str, start_date: DateTime<Utc>, end_date: DateTime<Utc>) -> Self {
+        let mut metadata: Vec<CSVRow> = Vec::new();
         // Download HTML of metadata page and parse it with scraper
         let response = get(query_url).unwrap().text().unwrap(); 
         let page = Html::parse_document(&response);
@@ -66,16 +60,13 @@ impl AURNMetadata {
             let within_start: bool = start_date < site_end_date;
             let within_end: bool = end_date > site_start_date;
             if within_start && within_end {
-                self.metadata.push(record);
+                metadata.push(record);
             }
         }
-    }
-
-    pub fn get_site_id(&mut self) {
         let site_regex = Regex::new(r"\?site_id=").unwrap();
         let id_regex = Regex::new(r"\w*?$").unwrap();
-        for site_index in 0..self.metadata.len() {
-            let site = &self.metadata[site_index];
+        for site_index in 0..metadata.len() {
+            let site = &metadata[site_index];
             let uk_air_id: &str = site.get("UK-AIR ID").unwrap();
             let query_url: String = "https://uk-air.defra.gov.uk/networks/site-info?uka_id=".to_string() + uk_air_id;
             let response = get(query_url).unwrap().text().unwrap();
@@ -85,10 +76,13 @@ impl AURNMetadata {
             for bdata_tag in bdata_tags.into_iter() {
                 if site_regex.is_match(bdata_tag) {
                     let site_code = id_regex.captures(bdata_tag).unwrap().get(0).unwrap().as_str();
-                    self.metadata[site_index].insert("Site Code".to_string(), site_code.to_string());
-                    println!("{:?}", self.metadata[site_index]);
+                    metadata[site_index].insert("Site Code".to_string(), site_code.to_string());
+                    println!("{:?}", metadata[site_index]);
                 }
             }
+        }
+        Self {
+            metadata: metadata
         }
     }
 }
@@ -100,17 +94,10 @@ mod tests {
 
     /// Checks whether csv can be downloaded
     #[test]
-    fn csv_downloaded() {
-        let mut aurn: AURNMetadata = AURNMetadata::new();
-        aurn.get_metadata("https://uk-air.defra.gov.uk/networks/find-sites?site_name=&pollutant=9999&group_id=4&closed=true&country_id=9999&region_id=9999&location_type=9999&search=Search+Network&view=advanced&action=results", "2017-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap(), "2020-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap());
+    fn metadata_downloaded() {
+        let aurn: AURNMetadata = AURNMetadata::new("https://uk-air.defra.gov.uk/networks/find-sites?site_name=&pollutant=9999&group_id=4&closed=true&country_id=9999&region_id=9999&location_type=9999&search=Search+Network&view=advanced&action=results", "2017-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap(), "2020-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap());
         assert!(aurn.metadata.len() > 0);
     }
 
-    #[test]
-    fn site_id_found() {
-        let mut aurn: AURNMetadata = AURNMetadata::new();
-        aurn.get_metadata("https://uk-air.defra.gov.uk/networks/find-sites?site_name=&pollutant=9999&group_id=4&closed=true&country_id=9999&region_id=9999&location_type=9999&search=Search+Network&view=advanced&action=results", "2017-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap(), "2020-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap());
-        aurn.get_site_id();
-    }
 }
 
