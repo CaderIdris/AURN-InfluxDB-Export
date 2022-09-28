@@ -91,23 +91,50 @@ impl AURNMetadata {
     ///
     /// ```
     pub fn new(ukair_config: &HashMap<&str, &str>) -> Self {
-        let md_query_url: String = ukair_config.get("Domain").unwrap().to_string() + ukair_config.get("Metadata Query").unwrap();
         let mut metadata: Vec<CSVRow> = Vec::new();
+        
+        // Get required variables from ukair_config
+        let domain: String = match ukair_config.get("Domain") {
+            Some(domain) => domain.to_string(),
+            None => panic!("Error reading Domain from config file")
+        };
+        let csv_link: String = match ukair_config.get("Regex CSV Link") {
+            Some(regcsv) => regcsv.to_string(),
+            None => panic!("Error reading Regex CSV Link from config file")
+        };
+        let site_regex: regex::Regex = match ukair_config.get("Regex Site ID Link") {
+            Some(regex_string) => Regex::new(regex_string).unwrap(),
+            None => panic!("Error reading Regex Site ID Link from config file")
+        };
+        let id_regex: regex::Regex = match ukair_config.get("Regex Site ID Code") {
+            Some(regex_string) => Regex::new(regex_string).unwrap(),
+            None => panic!("Error reading Regex Site ID Code from config file")
+        };
+        let md_query: &str = match ukair_config.get("Metadata Query") {
+            Some(query) => query,
+            None => panic!("Error getting UK-AIR domain from config file")
+        };
+        let md_query_url: String = domain + md_query;
         // Download HTML of metadata page and parse it with scraper
-        let md_response = get(md_query_url).unwrap().text().unwrap(); 
-        let md_page = Html::parse_document(&md_response);
-        // Find csv download link and download metadata csv
-        let csv_download_link_find = Selector::parse(ukair_config.get("Regex CSV Link").unwrap()).unwrap();
-        let csv_download_link = md_page.select(&csv_download_link_find).next().unwrap()
-        .value().attr("href").unwrap();
-        let csv_string = get(csv_download_link).unwrap().text().unwrap();
+        let md_page = match _read_metadata_html(md_query_url) {
+            Some(md_page) => md_page,
+            None => panic!("Error reading AURN website. Cannot read HTML file.")
+        };
+        // Find csv download link
+        let csv_download_link = match _get_metadata_csv_link(&md_page, csv_link) {
+            Some(csv_download_link) => csv_download_link,
+            None => panic!("Cannot find csv link in HTML file")
 
-        // Iterate over csv, deserialize each row into a Row struct and add to metadata Vec
-        let mut csv_reader = Reader::from_reader(csv_string.as_bytes());
+        };
+        // Download csv_file and store it as a Reader object for deserialisation
+        let csv_string = match _download_metadata_csv(csv_download_link.to_string()) {
+            Some(csv_string) => csv_string,
+            None => panic!("Cannot download csv file")
+
+        };
+        let mut csv_reader: Reader<&[u8]> = Reader::from_reader(csv_string.as_bytes());
 
         // Regex expressions for finding Site ID within HTML for station
-        let site_regex = Regex::new(ukair_config.get("Regex Site ID Link").unwrap()).unwrap();
-        let id_regex = Regex::new(ukair_config.get("Regex Site ID Code").unwrap()).unwrap();
 
         for result in csv_reader.deserialize() {
             let mut record: CSVRow = result.unwrap();
@@ -131,6 +158,7 @@ impl AURNMetadata {
         }
     }
 
+
     /// Removes metadata for any stations that weren't active within specified date range.
     ///
     /// The metadata downloaded contains info from all monitoring stations that full under the AURN
@@ -140,8 +168,8 @@ impl AURNMetadata {
     /// requests that fail due to no data being present.
     ///
     /// # Arguments
-    /// * `start_date` - (`DateTime<UTC>`) The date to begin downloading measurements from
     /// * `end_date` - (`DateTime<UTC>`) The date to end measurement downloads at
+    /// * `start_date` - (`DateTime<UTC>`) The date to begin downloading measurements from
     ///
     /// # Panics
     /// TBA
@@ -189,6 +217,72 @@ impl AURNMetadata {
 
     }
 
+}
+
+/// Downloads HTML of metadata page and parses it with scraper
+///
+/// As there's no official AURN API, we have to read the HTML of the AURN website to get the
+/// metadata for all the different sites in the AURN. This private function reads the HTML from
+/// the AURN website and locates the download link for a csv file which contains most
+/// information relevant to the AURN monitoring sites.
+///
+/// # Arguments
+/// * `query_url` - (`String`) The URL containing the link to the metadata csv
+///
+/// # Panics
+/// None
+///
+/// # Examples
+///
+/// ```
+/// // Download HTML of metadata page and parse it with scraper
+/// let md_page = match _read_metadata_html(md_query_url) {
+///     Some(md_page) => md_page,
+///     None => panic!("Error reading AURN website. Cannot read HTML file.")
+/// };
+///
+///
+/// ```
+fn _read_metadata_html(query_url: String) -> Option<Html> {
+    let response = get(query_url).unwrap().text().unwrap(); 
+    let page = Html::parse_document(&response);
+    Some(page)
+}
+
+/// Gets the link to the metadata csv file by reading a HTML file downloaded from the AURN website
+///
+/// With no official AURN API, the link to download the metadata csv must be found by reading the
+/// HTML file downloaded from the AURN website and parsing it for the download link. This is
+/// currently done by looking for the bCSV class but if the HTML source changes then the "Regex CSV
+/// Link" variable in the config file may have to be changed
+///
+/// # Arguments
+/// * 'html_file' - (`Html`) HTML file to be parsed by the selector crate
+/// * 'regex_csv_link' - (Option<&str>) Regex string used to look for the bCSV class in the HTML
+/// code. This contains the metadata csv link. Will be Some(&str) if config file is properly
+/// formatted, None otherwise
+///
+/// # Panics 
+/// If the Regex CSV link is improperly formatted in the config file, or not present at
+/// all, the function will panic.
+/// If the csv link can't be found in the Html file, the function will panic.
+fn _get_metadata_csv_link<'a>(html_file: &'a Html, regex_csv_link: String) -> Option<&'a str> {
+    let csv_download_link_find = match Selector::parse(&regex_csv_link) {
+        Ok(csv_download_link_find) => csv_download_link_find,
+        Err(error) => panic!("Couldn't find csv link in HTML file: {:?}", error)
+    };
+    let csv_download_link = html_file.select(&csv_download_link_find).next().unwrap()
+    .value().attr("href");
+
+    csv_download_link
+}
+
+fn _download_metadata_csv(csv_download_link: String) -> Option<String> {
+    let csv_string: String = match get(csv_download_link) {
+        Ok(csv) => csv.text().unwrap(),
+        Err(error) => panic!("Could not download csv file: {:?}", error)
+    };
+    Some(csv_string)
 }
 
 
