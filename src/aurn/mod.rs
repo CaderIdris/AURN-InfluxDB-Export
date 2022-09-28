@@ -94,9 +94,13 @@ impl AURNMetadata {
         let mut metadata: Vec<CSVRow> = Vec::new();
         
         // Get required variables from ukair_config
-        let domain: String = match ukair_config.get("Domain") {
-            Some(domain) => domain.to_string(),
+        let domain: &str = match ukair_config.get("Domain") {
+            Some(domain) => domain,
             None => panic!("Error reading Domain from config file")
+        };
+        let site_info_urn: &str = match ukair_config.get("Site Info URN") {
+            Some(urn) => urn,
+            None => panic!("Error reading Site Info URN from config file")
         };
         let csv_link: String = match ukair_config.get("Regex CSV Link") {
             Some(regcsv) => regcsv.to_string(),
@@ -114,9 +118,9 @@ impl AURNMetadata {
             Some(query) => query,
             None => panic!("Error getting UK-AIR domain from config file")
         };
-        let md_query_url: String = domain + md_query;
+        let md_query_url: String = domain.to_string() + md_query;
         // Download HTML of metadata page and parse it with scraper
-        let md_page = match _read_metadata_html(md_query_url) {
+        let md_page = match _read_html(md_query_url) {
             Some(md_page) => md_page,
             None => panic!("Error reading AURN website. Cannot read HTML file.")
         };
@@ -135,14 +139,18 @@ impl AURNMetadata {
         let mut csv_reader: Reader<&[u8]> = Reader::from_reader(csv_string.as_bytes());
 
         // Regex expressions for finding Site ID within HTML for station
-
         for result in csv_reader.deserialize() {
             let mut record: CSVRow = result.unwrap();
-            let uk_air_id: &str = record.get("UK-AIR ID").unwrap();
-            let site_query_urn: String = ukair_config.get("Site Info URN").unwrap().to_string() + uk_air_id;
-            let site_query: String = ukair_config.get("Domain").unwrap().to_string() + &site_query_urn;
-            let site_response = get(site_query).unwrap().text().unwrap();
-            let site_page = Html::parse_document(&site_response);
+            let uk_air_id: &str = match record.get("UK-AIR ID") {
+                Some(id) => id,
+                None => panic!("UKAIR ID not found in csv")
+            };
+            let site_query_urn: String = site_info_urn.to_string() + uk_air_id;
+            let site_query: String = domain.to_string() + &site_query_urn;
+            let site_page: Html = match _read_html(site_query) {
+                Some(page) => page,
+                None => panic!("Could not find html page for {:?}", uk_air_id)
+            };
             let site_code_find = Selector::parse(r#"a[class="bData"]"#).unwrap();
             let bdata_tags = site_page.select(&site_code_find).map(|x| x.value().attr("href").unwrap());
             for bdata_tag in bdata_tags.into_iter() {
@@ -219,7 +227,7 @@ impl AURNMetadata {
 
 }
 
-/// Downloads HTML of metadata page and parses it with scraper
+/// Downloads HTML source and parses it with scraper
 ///
 /// As there's no official AURN API, we have to read the HTML of the AURN website to get the
 /// metadata for all the different sites in the AURN. This private function reads the HTML from
@@ -243,7 +251,7 @@ impl AURNMetadata {
 ///
 ///
 /// ```
-fn _read_metadata_html(query_url: String) -> Option<Html> {
+fn _read_html(query_url: String) -> Option<Html> {
     let response = get(query_url).unwrap().text().unwrap(); 
     let page = Html::parse_document(&response);
     Some(page)
@@ -313,6 +321,23 @@ mod tests {
         aurn.select_between_dates("2017-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap(), "2020-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap());
         dbg!(aurn.metadata.len());
         assert!(aurn.metadata.len() < met_length_init);
+    }
+
+    #[test]
+    #[should_panic]
+    fn wrong_url_panic() {
+        let _panic = match _read_html("Bad URL".to_string()) {
+            Some(_nothing) => "This should never happen",
+            None => panic!("This should happen")
+        };
+        assert_eq!(1, 1);
+    }
+
+    #[test]
+    fn metadata_html_download() {
+        let test_config = return_test_config();
+        let _html = _read_html(test_config.get("Domain").unwrap().to_string() + test_config.get("Metadata Query").unwrap());
+        assert_eq!(1, 1);
     }
 
 }
