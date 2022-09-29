@@ -131,7 +131,7 @@ impl AURNMetadata {
 
         };
         // Download csv_file and store it as a Reader object for deserialisation
-        let csv_string = match _download_metadata_csv(csv_download_link.to_string()) {
+        let csv_string = match _download_csv(csv_download_link.to_string()) {
             Some(csv_string) => csv_string,
             None => panic!("Cannot download csv file")
 
@@ -140,7 +140,11 @@ impl AURNMetadata {
 
         // Regex expressions for finding Site ID within HTML for station
         for result in csv_reader.deserialize() {
-            let mut record: CSVRow = result.unwrap();
+            let mut record: CSVRow = match result {
+                Ok(rec) => rec,
+                Err(error) => panic!("Error translating CSV row to CSVRow Hashmap: {:?}", error)
+
+            };
             let uk_air_id: &str = match record.get("UK-AIR ID") {
                 Some(id) => id,
                 None => panic!("UKAIR ID not found in csv")
@@ -266,9 +270,8 @@ fn _read_html(query_url: String) -> Option<Html> {
 ///
 /// # Arguments
 /// * 'html_file' - (`Html`) HTML file to be parsed by the selector crate
-/// * 'regex_csv_link' - (Option<&str>) Regex string used to look for the bCSV class in the HTML
-/// code. This contains the metadata csv link. Will be Some(&str) if config file is properly
-/// formatted, None otherwise
+/// * 'regex_csv_link' - (String) Regex string used to look for the bCSV class in the HTML
+/// code. 
 ///
 /// # Panics 
 /// If the Regex CSV link is improperly formatted in the config file, or not present at
@@ -285,7 +288,16 @@ fn _get_metadata_csv_link<'a>(html_file: &'a Html, regex_csv_link: String) -> Op
     csv_download_link
 }
 
-fn _download_metadata_csv(csv_download_link: String) -> Option<String> {
+/// Downloads csv file
+///
+/// Downloads csv file from the internet and returns it as a String 
+///
+/// # Arguments
+/// * 'csv_download_link' - ('String') Link to the csv file to be downloaded 
+///
+/// # Panics
+/// If the csv file cannot be downloaded, the function panics
+fn _download_csv(csv_download_link: String) -> Option<String> {
     let csv_string: String = match get(csv_download_link) {
         Ok(csv) => csv.text().unwrap(),
         Err(error) => panic!("Could not download csv file: {:?}", error)
